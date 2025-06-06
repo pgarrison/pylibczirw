@@ -30,6 +30,10 @@ on:
         required: false
         default: ""
         type: string
+      CIBWBEFOREALLMACOS:
+        required: false
+        default: ""
+        type: string
     outputs:
       pypi_released:
         value: ${{ jobs.CodeQualityAnalysis-Test.outputs.pypi_released }}
@@ -121,6 +125,11 @@ jobs:
             PoolImage: windows-2019,
             OS: Windows,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLWindows}}",
+          }
+          - {
+            PoolImage: macos-latest,
+            OS: macOS,
+            CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLMACOS}}",
           }
     steps:
       - uses: actions/checkout@v4.1.0
