@@ -127,7 +127,8 @@ jobs:
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLWindows}}",
           }
           - {
-            PoolImage: macos-latest,
+            # macos-13 is x86-64
+            PoolImage: macos-13,
             OS: macOS,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLMACOS}}",
           }
