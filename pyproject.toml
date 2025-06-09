@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "cmake", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pylibCZIrw"
+version = "0.0.0"  # This will be updated by python-semantic-release
+description = "A python wrapper around the libCZI C++ library with reading and writing functionality."
+readme = {files = ["INFO.md", "CHANGELOG.md"], content-type = "text/markdown"}
+requires-python = ">=3.8,<3.14"
+license = {files = ["COPYING", "COPYING.LESSER", "NOTICE"]}
+authors = [
+    {name = "Sebastian Soyer", email = "sebastian.soyer@zeiss.com"}
+]
+keywords = ["czi", "imaging"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "cmake",
+    "xmltodict",
+    "validators",
+    "packaging",
+]
+
+[project.urls]
+Homepage = "https://github.com/zeiss-microscopy/pylibCZIrw"
+Documentation = "https://pylibczirw.readthedocs.io/"
+Repository = "https://github.com/zeiss-microscopy/pylibCZIrw.git"
+Issues = "https://github.com/zeiss-microscopy/pylibCZIrw/issues"
+
+[tool.setuptools]
+packages = ["pylibCZIrw"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "pylibCZIrw.__version__"}
+
+[tool.setuptools.cmdclass]
+build_ext = "pylibCZIrw.build_ext:CMakeBuild"
+
+[tool.setuptools.ext_modules]
+_pylibCZIrw = {sourcedir = "pylibCZIrw"} 

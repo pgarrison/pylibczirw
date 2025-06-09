@@ -1,4 +1,4 @@
-"""Holds all relevant information for packaging and publishing to PyPI."""
+"""CMake build extension for pylibCZIrw."""
 
 import os
 import platform
@@ -9,21 +9,8 @@ from pathlib import Path
 from typing import List
 
 from packaging.version import Version
-from setuptools import Extension, setup
+from setuptools import Extension
 from setuptools.command.build_ext import build_ext
-
-# DO NOT CHANGE
-# THIS IS UPDATED AUTOMATICALLY THROUGH PYTHON-SEMANTIC-RELEASE
-VERSION = "0.0.0"
-
-with open("INFO.md", encoding="utf-8") as info_file:
-    info = info_file.read()
-
-with open("CHANGELOG.md", encoding="utf-8") as changelog_file:
-    changelog = changelog_file.read()
-
-# List any runtime requirements here
-requirements = ["numpy", "cmake", "xmltodict", "validators", "packaging"]
 
 
 class CMakeExtension(Extension):
@@ -74,7 +61,7 @@ class CMakeBuild(build_ext):
         cmake_args += ["-DLIBCZI_BUILD_UNITTESTS=OFF"]  # also, we don't need the unit tests
         cmake_args += ["-DLIBCZI_BUILD_CURL_BASED_STREAM=ON"]  # and we want a version which is "libcurl-enabled"
 
-        cmake_args += ["-DPYLIBCZIRW_VERSION=" + VERSION]  # Have the same version as the Python package
+        cmake_args += ["-DPYLIBCZIRW_VERSION=" + self.distribution.get_version()]  # Have the same version as the Python package
 
         if platform.system() == "Windows":
             cmake_args += [f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"]
@@ -221,41 +208,4 @@ def check_and_install_packages(packages: List[str], triplet: str, vcpkg_root: st
                 ],
                 check=False,
             )
-    print("Installations complete")
-
-
-setup(
-    name="pylibCZIrw",
-    version=VERSION,
-    author="Sebastian Soyer",
-    author_email="sebastian.soyer@zeiss.com",
-    description="A python wrapper around the libCZI C++ library with reading and writing functionality.",
-    long_description="\n".join([info, changelog]),
-    long_description_content_type="text/markdown",
-    # See https://setuptools.pypa.io/en/latest/userguide/datafiles.html
-    include_package_data=True,
-    keywords="czi, imaging",
-    ext_modules=[CMakeExtension("_pylibCZIrw")],
-    packages=["pylibCZIrw"],
-    cmdclass={"build_ext": CMakeBuild},
-    install_requires=requirements,
-    # we require at least python version 3.7
-    python_requires=">=3.8,<3.14",
-    license_files=["COPYING", "COPYING.LESSER", "NOTICE"],
-    # Classifiers help users find your project by categorizing it.
-    # For a list of valid classifiers, see https://pypi.org/classifiers/
-    classifiers=[
-        "Development Status :: 5 - Production/Stable",
-        "Topic :: Scientific/Engineering :: Image Processing",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Programming Language :: Python :: 3.13",
-        "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
-        "Operating System :: Microsoft :: Windows",
-        "Operating System :: Unix",
-    ],
-    zip_safe=False,
-)
+    print("Installations complete") 
