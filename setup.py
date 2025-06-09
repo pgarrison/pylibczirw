@@ -105,6 +105,59 @@ class CMakeBuild(build_ext):
                 raise RuntimeError("vcpkg installation not found, please define your VCPKG_INSTALLATION_ROOT path")
 
             build_args += ["--", "/m"]
+        elif platform.system() == "Darwin":  # macOS
+            cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
+
+            # Get macOS version
+            macos_version = platform.mac_ver()[0]
+            is_github_actions = os.environ.get("GITHUB_ACTIONS") == "true"
+
+            # On GitHub Actions runners, we'll use the system libraries
+            if is_github_actions:
+                cmake_args += [
+                    "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON",
+                    "-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl@3",
+                    "-DOPENSSL_LIBRARIES=/usr/local/opt/openssl@3/lib",
+                    "-DOPENSSL_INCLUDE_DIR=/usr/local/opt/openssl@3/include",
+                ]
+            else:
+                # For local builds, try Homebrew first
+                try:
+                    brew_prefix = subprocess.check_output(["brew", "--prefix"], text=True).strip()  # nosec
+                    if os.path.exists(brew_prefix):
+                        cmake_args += [
+                            "-DOPENSSL_ROOT_DIR=" + os.path.join(brew_prefix, "opt/openssl@3"),
+                            "-DOPENSSL_LIBRARIES=" + os.path.join(brew_prefix, "opt/openssl@3/lib"),
+                            "-DOPENSSL_INCLUDE_DIR=" + os.path.join(brew_prefix, "opt/openssl@3/include"),
+                        ]
+                        cmake_args += [
+                            "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
+                        ]  # Use system curl from Homebrew
+                    else:
+                        print("Homebrew not found, attempting to build dependencies locally")
+                        cmake_args += [
+                            "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=OFF"
+                        ]  # Build curl ourselves if Homebrew is not available
+                except subprocess.CalledProcessError:
+                    print("Homebrew not found, attempting to build dependencies locally")
+                    cmake_args += [
+                        "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=OFF"
+                    ]
+
+            # Set macOS-specific compiler flags
+            cmake_args += [
+                "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15",  # Minimum macOS version
+                "-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64",  # Support both Intel and Apple Silicon
+            ]
+
+            # Add optimization flags for release builds
+            if not self.debug:
+                cmake_args += [
+                    "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG",
+                    "-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG",
+                ]
+
+            build_args += ["--", "-j2"]
         else:  # Linux
             # Get the value of the environment variable
             manylinux_env_variable = os.environ.get("AUDITWHEEL_PLAT", "").lower()
