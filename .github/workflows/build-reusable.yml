@@ -135,14 +135,14 @@ jobs:
           - {
             # macos-13 is x86-64
             PoolImage: macos-13,
-            OS: macOS,
+            OS: macOS-x86_64,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLMACOS}}",
             CIBW_ENVIRONMENT: "${{inputs.CIBW_ENVIRONMENT_MACOS}}",
           }
           - {
             # macos-14 is arm64
             PoolImage: macos-14,
-            OS: macOS,
+            OS: macOS-arm64,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLMACOS}}",
             CIBW_ENVIRONMENT: "${{inputs.CIBW_ENVIRONMENT_MACOS}}"
           }
