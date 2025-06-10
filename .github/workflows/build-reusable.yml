@@ -34,6 +34,10 @@ on:
         required: false
         default: ""
         type: string
+      CIBW_ENVIRONMENT_MACOS:
+        required: false
+        default: ""
+        type: string
     outputs:
       pypi_released:
         value: ${{ jobs.CodeQualityAnalysis-Test.outputs.pypi_released }}
@@ -120,17 +124,27 @@ jobs:
             PoolImage: ubuntu-latest,
             OS: Linux,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLLINUX}}",
+            CIBW_ENVIRONMENT: "",
           }
           - {
             PoolImage: windows-2019,
             OS: Windows,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLWindows}}",
+            CIBW_ENVIRONMENT: "",
           }
           - {
             # macos-13 is x86-64
             PoolImage: macos-13,
             OS: macOS,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLMACOS}}",
+            CIBW_ENVIRONMENT: "${{inputs.CIBW_ENVIRONMENT_MACOS}}",
+          }
+          - {
+            # macos-14 is arm64
+            PoolImage: macos-14,
+            OS: macOS,
+            CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLMACOS}}",
+            CIBW_ENVIRONMENT: "${{inputs.CIBW_ENVIRONMENT_MACOS}}"
           }
     steps:
       - uses: actions/checkout@v4.1.0
@@ -146,6 +160,7 @@ jobs:
           PkgRootFolder: "${{ github.workspace }}/${{inputs.PkgRootFolder}}"
           OS: "${{matrix.config.OS}}"
           CIBWBEFOREALL: "${{matrix.config.CIBWBEFOREALL}}"
+          CIBW_ENVIRONMENT: "${{matrix.config.CIBW_ENVIRONMENT}}"
     if: inputs.Pure == false
   PackageWheelsPure:
     name: Package Pure Wheels

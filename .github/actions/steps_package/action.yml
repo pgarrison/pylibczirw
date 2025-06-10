@@ -8,6 +8,10 @@ inputs:
   CIBWBEFOREALL:
     description: arguments to cibuildwheel
     required: true
+  CIBW_ENVIRONMENT:
+    description: environment variables to set for cibuildwheel
+    required: false
+    default: ""
   PkgRootFolder:
     description: root folder of Python package
     required: true
@@ -22,6 +26,13 @@ runs:
       with:
         PyVersionLatest: "${{inputs.PyVersionLatest}}"
         PkgRootFolder: "${{inputs.PkgRootFolder}}"
+    # Python 3.8 on MacOS arm64 is a special case because there is not an
+    # official installer. This setup-python step is the solution.
+    # https://cibuildwheel.pypa.io/en/stable/faq/#macos-building-cpython-38-wheels-on-arm64
+    - uses: actions/setup-python@v5
+      with:
+        python-version: 3.8
+      if: runner.os == 'macOS' && runner.arch == 'ARM64'
     - name: Install dependencies
       run: |-
         set -o errexit
@@ -34,8 +45,7 @@ runs:
         CIBW_ARCHS: auto64
         CIBW_SKIP: pp* *-musllinux_*
         CIBW_BEFORE_ALL: "${{inputs.CIBWBEFOREALL}}"
-        # TODO make this an input
-        CIBW_ENVIRONMENT: MACOSX_DEPLOYMENT_TARGET=10.15
+        CIBW_ENVIRONMENT: "${{inputs.CIBW_ENVIRONMENT}}"
         CIBW_TEST_REQUIRES: "-r requirements_test.txt"
         CIBW_TEST_COMMAND: tox -c {project}/tox_cibuildwheel.ini -e base --skip-pkg-install --current-env -vv
       run: cibuildwheel --output-dir wheelhouse .
