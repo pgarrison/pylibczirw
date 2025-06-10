@@ -122,7 +122,13 @@ jobs:
         config:
           - {
             PoolImage: ubuntu-latest,
-            OS: Linux,
+            OS: Linux-x86_64,
+            CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLLINUX}}",
+            CIBW_ENVIRONMENT: "",
+          }
+          - {
+            PoolImage: ubuntu-24.04-arm,
+            OS: Linux-arm64,
             CIBWBEFOREALL: "${{inputs.CIBWBEFOREALLLINUX}}",
             CIBW_ENVIRONMENT: "",
           }
