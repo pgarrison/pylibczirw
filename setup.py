@@ -108,11 +108,8 @@ class CMakeBuild(build_ext):
         elif platform.system() == "Darwin":  # macOS
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
 
-            # Get macOS version
-            macos_version = platform.mac_ver()[0]
-            is_github_actions = os.environ.get("GITHUB_ACTIONS") == "true"
-
             # On GitHub Actions runners, we'll use the system libraries
+            is_github_actions = os.environ.get("GITHUB_ACTIONS") == "true"
             if is_github_actions:
                 cmake_args += [
                     "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON",
