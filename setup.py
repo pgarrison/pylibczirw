@@ -121,25 +121,23 @@ class CMakeBuild(build_ext):
                 # For local builds, try Homebrew first
                 try:
                     brew_prefix = subprocess.check_output(["brew", "--prefix"], text=True).strip()  # nosec
-                    if os.path.exists(brew_prefix):
-                        cmake_args += [
-                            "-DOPENSSL_ROOT_DIR=" + os.path.join(brew_prefix, "opt/openssl@3"),
-                            "-DOPENSSL_LIBRARIES=" + os.path.join(brew_prefix, "opt/openssl@3/lib"),
-                            "-DOPENSSL_INCLUDE_DIR=" + os.path.join(brew_prefix, "opt/openssl@3/include"),
-                        ]
-                        cmake_args += [
-                            "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
-                        ]  # Use system curl from Homebrew
-                    else:
-                        print("Homebrew not found, attempting to build dependencies locally")
-                        cmake_args += [
-                            "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=OFF"
-                        ]  # Build curl ourselves if Homebrew is not available
                 except subprocess.CalledProcessError:
+                    brew_prefix = None
+
+                if brew_prefix is not None and os.path.exists(brew_prefix):
+                    cmake_args += [
+                        "-DOPENSSL_ROOT_DIR=" + os.path.join(brew_prefix, "opt/openssl@3"),
+                        "-DOPENSSL_LIBRARIES=" + os.path.join(brew_prefix, "opt/openssl@3/lib"),
+                        "-DOPENSSL_INCLUDE_DIR=" + os.path.join(brew_prefix, "opt/openssl@3/include"),
+                    ]
+                    cmake_args += [
+                        "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
+                    ]  # Use system curl from Homebrew
+                else:
                     print("Homebrew not found, attempting to build dependencies locally")
                     cmake_args += [
                         "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=OFF"
-                    ]
+                    ]  # Build curl ourselves if Homebrew is not available
 
             # Set macOS-specific compiler flags
             cmake_args += [
