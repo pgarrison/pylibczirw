@@ -87,7 +87,7 @@ class CMakeBuild(build_ext):
         build_args = ["--", "/m"]
         return cmake_args, build_args
 
-    def _build_extension_macos(self, cfg, extdir):  # type: ignore[no-untyped-def]
+    def _build_extension_macos(self, cfg):  # type: ignore[no-untyped-def]
         cmake_args = ["-DCMAKE_BUILD_TYPE=" + cfg]
 
         # On GitHub Actions runners, we'll use the system libraries
@@ -112,9 +112,7 @@ class CMakeBuild(build_ext):
                     "-DOPENSSL_LIBRARIES=" + os.path.join(brew_prefix, "opt/openssl@3/lib"),
                     "-DOPENSSL_INCLUDE_DIR=" + os.path.join(brew_prefix, "opt/openssl@3/include"),
                 ]
-                cmake_args += [
-                    "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
-                ]  # Use system curl from Homebrew
+                cmake_args += ["-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"]  # Use system curl from Homebrew
             else:
                 print("Homebrew not found, attempting to build dependencies locally")
                 cmake_args += [
@@ -138,7 +136,7 @@ class CMakeBuild(build_ext):
         return cmake_args, build_args
 
     @staticmethod
-    def _build_extension_linux(cfg, extdir):  # type: ignore[no-untyped-def]
+    def _build_extension_linux(cfg):  # type: ignore[no-untyped-def]
         cmake_args = []
         # Get the value of the environment variable
         manylinux_env_variable = os.environ.get("AUDITWHEEL_PLAT", "").lower()
@@ -231,9 +229,9 @@ class CMakeBuild(build_ext):
         if platform.system() == "Windows":
             new_cmake_args, new_build_args = self._build_extension_windows(cfg, extdir)
         elif platform.system() == "Darwin":  # macOS
-            new_cmake_args, new_build_args = self._build_extension_macos(cfg, extdir)
+            new_cmake_args, new_build_args = self._build_extension_macos(cfg)
         else:  # Linux
-            new_cmake_args, new_build_args = self._build_extension_linux(cfg, extdir)
+            new_cmake_args, new_build_args = self._build_extension_linux(cfg)
         cmake_args += new_cmake_args
         build_args += new_build_args
 
