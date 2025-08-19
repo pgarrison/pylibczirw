@@ -55,6 +55,156 @@ class CMakeBuild(build_ext):
         for ext in self.extensions:
             self.build_extension(ext)
 
+    @staticmethod
+    def _build_extension_windows(cfg, extdir):  # type: ignore[no-untyped-def]
+        cmake_args = [f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"]
+        cmake_args += ["-DVCPKG_TARGET_TRIPLET=x64-windows-static"]
+        vcpkg_installation_root = os.environ.get("VCPKG_INSTALLATION_ROOT", "C:\\vcpkg")
+        if os.path.exists(vcpkg_installation_root):
+            check_and_install_packages(
+                packages=["curl[ssl]", "eigen3"],
+                triplet="x64-windows-static",
+                vcpkg_root=vcpkg_installation_root,
+            )
+            cmake_args += [
+                "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
+            ]  # instruct to use the package-manager provided libcurl
+            cmake_args += [
+                "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_EIGEN3=ON"
+            ]  # instruct to use the package-manager provided eigen3
+            cmake_args += [
+                "-DCMAKE_TOOLCHAIN_FILE="
+                + os.path.join(
+                    vcpkg_installation_root,
+                    "scripts",
+                    "buildsystems",
+                    "vcpkg.cmake",
+                )
+            ]
+        else:
+            raise RuntimeError("vcpkg installation not found, please define your VCPKG_INSTALLATION_ROOT path")
+
+        build_args = ["--", "/m"]
+        return cmake_args, build_args
+
+    def _build_extension_macos(self, cfg):  # type: ignore[no-untyped-def]
+        cmake_args = ["-DCMAKE_BUILD_TYPE=" + cfg]
+
+        # On GitHub Actions runners, we'll use the system libraries
+        is_github_actions = os.environ.get("GITHUB_ACTIONS") == "true"
+        if is_github_actions:
+            cmake_args += [
+                "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON",
+                "-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl@3",
+                "-DOPENSSL_LIBRARIES=/usr/local/opt/openssl@3/lib",
+                "-DOPENSSL_INCLUDE_DIR=/usr/local/opt/openssl@3/include",
+            ]
+        else:
+            # For local builds, try Homebrew first
+            try:
+                brew_prefix = subprocess.check_output(["brew", "--prefix"], text=True).strip()  # nosec
+            except subprocess.CalledProcessError:
+                brew_prefix = None
+
+            if brew_prefix is not None and os.path.exists(brew_prefix):
+                cmake_args += [
+                    "-DOPENSSL_ROOT_DIR=" + os.path.join(brew_prefix, "opt/openssl@3"),
+                    "-DOPENSSL_LIBRARIES=" + os.path.join(brew_prefix, "opt/openssl@3/lib"),
+                    "-DOPENSSL_INCLUDE_DIR=" + os.path.join(brew_prefix, "opt/openssl@3/include"),
+                ]
+                cmake_args += ["-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"]  # Use system curl from Homebrew
+            else:
+                print("Homebrew not found, attempting to build dependencies locally")
+                cmake_args += [
+                    "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=OFF"
+                ]  # Build curl ourselves if Homebrew is not available
+
+        # Set macOS-specific compiler flags
+        cmake_args += [
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15",  # Minimum macOS version
+            "-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64",  # Support both Intel and Apple Silicon
+        ]
+
+        # Add optimization flags for release builds
+        if not self.debug:
+            cmake_args += [
+                "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG",
+                "-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG",
+            ]
+
+        build_args = ["--", "-j2"]
+        return cmake_args, build_args
+
+    @staticmethod
+    def _build_extension_linux(cfg):  # type: ignore[no-untyped-def]
+        cmake_args = []
+        # Get the value of the environment variable
+        manylinux_env_variable = os.environ.get("AUDITWHEEL_PLAT", "").lower()
+        if "manylinux" in manylinux_env_variable:
+            # When running in manylinux-container, we want to build openssl ourselves and link it statically.
+            # On the CI/CD-server, we set the variable "BUILDWHEEL_STATIC_OPENSSL" in order to instruct running a
+            # local build of openSSL (and instruct the libCZI-build to use it)
+            print("Building static openssl and zlib dependencies locally.")
+            subprocess.run(  # nosec
+                "cd /tmp && "
+                "git clone --branch v1.3 https://github.com/madler/zlib.git && "
+                "cd zlib && "
+                "CFLAGS=-fPIC ./configure --static && "
+                "make -j2 && "
+                "make install",
+                shell=True,  # nosec
+                check=False,
+            )
+            subprocess.run(  # nosec
+                "cd /tmp && "
+                "git clone --branch openssl-3.2.0 https://github.com/openssl/openssl.git && "
+                "cd openssl && "
+                "mkdir build && "
+                "./config no-shared -static zlib -fPIC -L/usr/lib no-docs no-tests && "
+                "make -j2",
+                shell=True,  # nosec
+                check=False,
+            )
+            cmake_args += [
+                "-DOPENSSL_USE_STATIC_LIBS=TRUE"
+            ]  # instruct to use the static version of libssl and libcrypto
+            cmake_args += ["-DOPENSSL_ROOT_DIR=/tmp/openssl"]
+            cmake_args += ["-DZLIB_USE_STATIC_LIBS=TRUE"]
+
+        # Test install curl using vcpkg on linux
+        print("env root is: " + os.environ.get("VCPKG_INSTALLATION_ROOT", ""))
+        vcpkg_installation_root = os.environ.get("VCPKG_INSTALLATION_ROOT", r"/usr/local/share/vcpkg")
+        print("set env root is: " + vcpkg_installation_root)
+        test = os.path.exists(vcpkg_installation_root)
+        print(f"path exists is: {test} ")
+        if os.path.exists(vcpkg_installation_root):
+            check_and_install_packages(
+                packages=["curl[ssl]"],
+                triplet="x64-linux",
+                vcpkg_root=vcpkg_installation_root,
+            )
+            cmake_args += [
+                "-DCMAKE_TOOLCHAIN_FILE="
+                + os.path.join(
+                    vcpkg_installation_root,
+                    "scripts",
+                    "buildsystems",
+                    "vcpkg.cmake",
+                )
+            ]
+            cmake_args += [
+                "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
+            ]  # if curl is available via vcpkg, then instruct to use the package-manager provided libcurl
+        else:
+            print("Pacakge manager missing, attempting to build libcurl dependency locally.")
+            cmake_args += [
+                "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=OFF"
+            ]  # otherwise, we try to build libcurl ourselves (note: probably requires libssl-dev to be installed)
+
+        cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
+        build_args = ["--", "-j2"]
+        return cmake_args, build_args
+
     def build_extension(self, ext):  # type: ignore[no-untyped-def]
         """Builds CMake extension."""
 
@@ -77,100 +227,13 @@ class CMakeBuild(build_ext):
         cmake_args += ["-DPYLIBCZIRW_VERSION=" + VERSION]  # Have the same version as the Python package
 
         if platform.system() == "Windows":
-            cmake_args += [f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"]
-            cmake_args += ["-DVCPKG_TARGET_TRIPLET=x64-windows-static"]
-            vcpkg_installation_root = os.environ.get("VCPKG_INSTALLATION_ROOT", "C:\\vcpkg")
-            if os.path.exists(vcpkg_installation_root):
-                check_and_install_packages(
-                    packages=["curl[ssl]", "eigen3"],
-                    triplet="x64-windows-static",
-                    vcpkg_root=vcpkg_installation_root,
-                )
-                cmake_args += [
-                    "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
-                ]  # instruct to use the package-manager provided libcurl
-                cmake_args += [
-                    "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_EIGEN3=ON"
-                ]  # instruct to use the package-manager provided eigen3
-                cmake_args += [
-                    "-DCMAKE_TOOLCHAIN_FILE="
-                    + os.path.join(
-                        vcpkg_installation_root,
-                        "scripts",
-                        "buildsystems",
-                        "vcpkg.cmake",
-                    )
-                ]
-            else:
-                raise RuntimeError("vcpkg installation not found, please define your VCPKG_INSTALLATION_ROOT path")
-
-            build_args += ["--", "/m"]
+            new_cmake_args, new_build_args = self._build_extension_windows(cfg, extdir)
+        elif platform.system() == "Darwin":  # macOS
+            new_cmake_args, new_build_args = self._build_extension_macos(cfg)
         else:  # Linux
-            # Get the value of the environment variable
-            manylinux_env_variable = os.environ.get("AUDITWHEEL_PLAT", "").lower()
-            if "manylinux" in manylinux_env_variable:
-                # When running in manylinux-container, we want to build openssl ourselves and link it statically.
-                # On the CI/CD-server, we set the variable "BUILDWHEEL_STATIC_OPENSSL" in order to instruct running a
-                # local build of openSSL (and instruct the libCZI-build to use it)
-                print("Building static openssl and zlib dependencies locally.")
-                subprocess.run(  # nosec
-                    "cd /tmp && "
-                    "git clone --branch v1.3 https://github.com/madler/zlib.git && "
-                    "cd zlib && "
-                    "CFLAGS=-fPIC ./configure --static && "
-                    "make -j2 && "
-                    "make install",
-                    shell=True,  # nosec
-                    check=False,
-                )
-                subprocess.run(  # nosec
-                    "cd /tmp && "
-                    "git clone --branch openssl-3.2.0 https://github.com/openssl/openssl.git && "
-                    "cd openssl && "
-                    "mkdir build && "
-                    "./config no-shared -static zlib -fPIC -L/usr/lib no-docs no-tests && "
-                    "make -j2",
-                    shell=True,  # nosec
-                    check=False,
-                )
-                cmake_args += [
-                    "-DOPENSSL_USE_STATIC_LIBS=TRUE"
-                ]  # instruct to use the static version of libssl and libcrypto
-                cmake_args += ["-DOPENSSL_ROOT_DIR=/tmp/openssl"]
-                cmake_args += ["-DZLIB_USE_STATIC_LIBS=TRUE"]
-
-            # Test install curl using vcpkg on linux
-            print("env root is: " + os.environ.get("VCPKG_INSTALLATION_ROOT", ""))
-            vcpkg_installation_root = os.environ.get("VCPKG_INSTALLATION_ROOT", r"/usr/local/share/vcpkg")
-            print("set env root is: " + vcpkg_installation_root)
-            test = os.path.exists(vcpkg_installation_root)
-            print(f"path exists is: {test} ")
-            if os.path.exists(vcpkg_installation_root):
-                check_and_install_packages(
-                    packages=["curl[ssl]"],
-                    triplet="x64-linux",
-                    vcpkg_root=vcpkg_installation_root,
-                )
-                cmake_args += [
-                    "-DCMAKE_TOOLCHAIN_FILE="
-                    + os.path.join(
-                        vcpkg_installation_root,
-                        "scripts",
-                        "buildsystems",
-                        "vcpkg.cmake",
-                    )
-                ]
-                cmake_args += [
-                    "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=ON"
-                ]  # if curl is available via vcpkg, then instruct to use the package-manager provided libcurl
-            else:
-                print("Pacakge manager missing, attempting to build libcurl dependency locally.")
-                cmake_args += [
-                    "-DLIBCZI_BUILD_PREFER_EXTERNALPACKAGE_LIBCURL=OFF"
-                ]  # otherwise, we try to build libcurl ourselves (note: probably requires libssl-dev to be installed)
-
-            cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-            build_args += ["--", "-j2"]
+            new_cmake_args, new_build_args = self._build_extension_linux(cfg)
+        cmake_args += new_cmake_args
+        build_args += new_build_args
 
         env["CXXFLAGS"] = '{} -DVERSION_INFO=\\"{}\\"'.format(  # pylint: disable=consider-using-f-string
             env.get("CXXFLAGS", ""), self.distribution.get_version()
