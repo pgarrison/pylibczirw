@@ -8,6 +8,7 @@
 [![GitHub Pages](https://github.com/ZEISS/pylibczirw/actions/workflows/pages.yml/badge.svg?branch=main&event=push)](https://github.com/ZEISS/pylibczirw/actions/workflows/pages.yml)
 [![PyPI version](https://badge.fury.io/py/pylibCZIrw.svg)](https://badge.fury.io/py/pylibCZIrw)  
 
+
 # Contribute
 If you intend to **use** this repo, clone the repository on your machine with ``` git clone --recurse-submodules ```.  
 If you intend to also **contribute** to this repo, you are requested to copy ALL files in the hooks directory into your .git/hooks directory right after you cloned this repo!  
