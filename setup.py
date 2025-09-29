@@ -123,6 +123,7 @@ class CMakeBuild(build_ext):
         cmake_args += [
             "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15",  # Minimum macOS version
             "-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64",  # Support both Intel and Apple Silicon
+            "-DCMAKE_CXX_FLAGS_RELEASE=-std=c++17",  # Use the C++17 standard
         ]
 
         # Add optimization flags for release builds
